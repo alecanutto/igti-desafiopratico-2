@@ -3,22 +3,19 @@ import { readFileSync, writeFileSync } from 'fs';
 let states = [];
 let cities = [];
 
-let listCitiesByState = [];
-
 function createFiles() {
   try {
     states = JSON.parse(readFileSync("Estados.json"));
     cities = JSON.parse(readFileSync("Cidades.json"));
 
-    states.map(state => {
-      try {
-        const citiesByUf = cities.filter(item => item.Estado === state.ID);
+    try {
+      states.map(state => {
+        const citiesByUf = cities.filter(city => city.Estado === state.ID);
         writeFileSync(`${state.Sigla}.json`, JSON.stringify(citiesByUf, null, 2));
-        listCitiesByState.push(citiesByUf);
-      } catch (error) {
-        throw new Error(`Falha ao gravar cidades: ${error}`);
-      }
-    });
+      });
+    } catch (error) {
+      throw new Error(`Falha: ${error}`);
+    }
 
   } catch (error) {
     throw new Error(`Falha: ${error}`);
@@ -26,97 +23,93 @@ function createFiles() {
 }
 
 function countCitiesFromUF(uf) {
-  const fileUF = JSON.parse(readFileSync(`${uf}.json`));
-  const total = fileUF.length;
+  const total = JSON.parse(readFileSync(`${uf}.json`)).length;
   return {
     uf,
-    cidades: total
+    countCity: total
   }
 }
 
-function descCities() {
+function orderByQtd() {
   const arrayCities = states.map(({ Sigla }) => countCitiesFromUF(Sigla));
-  arrayCities.sort((a, b) => b.cidades - a.cidades);
-  console.log("Ordem decrescente - Mais cidades");
-  arrayCities.filter((_, index) => index < 5)
-    .map(({ uf, cidades }) => console.log(`${uf} - ${cidades}`));
+  arrayCities.sort((a, b) => b.countCity - a.countCity);
+  return arrayCities;
+}
+
+function getCitiesWithMoreCitiesDesc() {
+  return orderByQtd().slice(0, 5);
 };
 
-function ascCities() {
-  const arrayCities = states.map(({ Sigla }) => countCitiesFromUF(Sigla));
-  arrayCities.sort((a, b) => b.cidades - a.cidades);
-  console.log("Ordem decrescente - Menos cidades");
-  arrayCities.filter((_, index) => index > arrayCities.length - 6)
-    .map(({ uf, cidades }) => console.log(`${uf} - ${cidades}`));
+function getCitiesWithLessCitiesDesc() {
+  return orderByQtd().slice(-5);
 };
 
-function nameDescCities() {
-  states.map(({ Sigla }) => {
-    const fileUF = JSON.parse(readFileSync(`${Sigla}.json`));
-    fileUF.sort((a, b) => b.Nome.length - a.Nome.length);
-    fileUF.filter((_, index) => index < 1).map(({ Nome }) =>
-      console.log(`${Nome} - ${Sigla}`));
-  });
+const TYPE_ORDER = {
+  ASC: 1,
+  DESC: 2
 }
 
-function nameAscCities() {
-  states.map(({ Sigla }) => {
-    const fileUF = JSON.parse(readFileSync(`${Sigla}.json`));
-    fileUF.sort((a, b) => a.Nome.length - b.Nome.length);
-    fileUF.filter((_, index) => index < 1).map(({ Nome }) => console.log(`${Nome} - ${Sigla}`));
+function orderByName(typeOrder) {
+  const ordenedCities = states.map(state => {
+    const arrayCities = cities.filter(city => city.Estado === state.ID);
+    let city = null;
+    if (typeOrder === TYPE_ORDER.DESC) {
+      city = arrayCities.sort((a, b) => b.Nome.length - a.Nome.length)[0];
+    } else {
+      city = arrayCities.sort((a, b) => a.Nome.length - b.Nome.length)[0];
+    }
+    return {
+      nome: city.Nome,
+      uf: state.Sigla
+    }
   });
+  return ordenedCities;
 }
 
-function nameUp() {
-  let data = []
-  states.map(({ Sigla }) => {
-    const fileUF = JSON.parse(readFileSync(`${Sigla}.json`));
-    fileUF.sort((a, b) => b.Nome.length - a.Nome.length);
-    fileUF.filter((_, index) => index < 1).map(({ Nome }) => {
-      data.push({
-        Nome,
-        Sigla
-      });
+function getBiggerOrSmallName(typeOrder) {
+  const city = orderByName(typeOrder);
+  if (typeOrder === TYPE_ORDER.DESC) {
+    city.sort((a, b) => {
+      const size = b.nome.length - a.nome.length;
+      const alph = b.nome.localeCompare(a.nome);
+      return size || alph;
     });
-  });
-
-  data.sort((a, b) => {
-    const size = b.Nome.length - a.Nome.length;
-    const alph = b.Nome.localeCompare(a.Nome);
-    return size || alph
-  });
-
-  data.filter((_, index) => index < 1)
-    .map(({ Nome, Sigla }) => console.log(`${Nome} - ${Sigla}`));
-}
-
-function nameDown() {
-  let data = []
-  states.map(({ Sigla }) => {
-    const fileUF = JSON.parse(readFileSync(`${Sigla}.json`));
-    fileUF.sort((a, b) => a.Nome.length - b.Nome.length);
-    fileUF.filter((_, index) => index < 1).map(({ Nome }) => {
-      data.push({
-        Nome,
-        Sigla
-      });
+  } else {
+    city.sort((a, b) => {
+      const size = a.nome.length - b.nome.length;
+      const alph = a.nome.localeCompare(b.nome);
+      return size || alph;
     });
-  });
-  data.sort((a, b) => {
-    const size = a.Nome.length - b.Nome.length;
-    const alph = a.Nome.localeCompare(b.Nome);
-    return size || alph
-  });
-  data.filter((_, index) => index < 1)
-    .map(({ Nome, Sigla }) => console.log(`${Nome} - ${Sigla}`));
+  }
+  return city[0];
 }
 
-createFiles();
-countCitiesFromUF("MS");
-descCities();
-ascCities();
-nameDescCities();
-nameAscCities();
-nameUp();
-nameDown();
+function init() {
+  // 1 
+  createFiles();
+  // 2
+  const { uf, countCity } = countCitiesFromUF("MS");
+  console.log(`Estado: ${uf}, possui ${countCity} cidade(s)`);
+  // 3
+  console.log("5 Estados com maior número de cidades - Ordem decrescente");
+  getCitiesWithMoreCitiesDesc().map(({ uf, countCity }) => console.log(`${uf} - ${countCity}`));
+  // 4
+  console.log("5 Estados com menor número de cidades - Ordem decrescente");
+  getCitiesWithLessCitiesDesc().map(({ uf, countCity }) => console.log(`${uf} - ${countCity}`));
+  // 5 
+  console.log("Cidade de maior nome - Cada estado");
+  orderByName(TYPE_ORDER.DESC).map(({ nome, uf }) => console.log(`${nome} - ${uf}`));
+  // 6
+  console.log("Cidade de menor nome - Cada estado");
+  orderByName(TYPE_ORDER.ASC).map(({ nome, uf }) => console.log(`${nome} - ${uf}`));
+  // 7
+  console.log("Cidade de maior nome - Todos estados");
+  let city = getBiggerOrSmallName(TYPE_ORDER.DESC);
+  console.log(`${city.nome} - ${city.uf}`);
+  // 8
+  console.log("Cidade de menor nome - Todos estados");
+  city = getBiggerOrSmallName(TYPE_ORDER.ASC);
+  console.log(`${city.nome} - ${city.uf}`);
+}
 
+init();
